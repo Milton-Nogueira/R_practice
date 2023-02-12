@@ -1,0 +1,306 @@
+### In this project a dataset about costs for health insurance was used to practice a few machine learning models in R.
+
+
+```{r message=FALSE, warning=FALSE}
+library(fastDummies)
+library(ggplot2)  
+library(plotly)
+library(hrbrthemes)
+library(extrafont) 
+library(corrgram)
+library(caret)
+library(caTools)
+library(rpart)
+library(forecast)
+library(ISLR)
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+library(dplyr)
+library(ConfusionTableR)
+library(tidyr)
+library(mlbench)
+```
+
+
+```{r}
+#Reading the data
+
+df = read.csv("E:/Usuarios/Documentos/R/Medical Insurance/insurance.csv", na.strings="", stringsAsFactors = T)
+head(df)
+
+```
+
+```{r}
+summary(df)
+```
+
+```{r}
+#checking missing data
+df[!complete.cases(df),]
+```
+
+```{r}
+#Checking duplicated rows
+#df[!duplicated(df),]
+sum(duplicated(df))
+```
+
+
+
+Exploring the variables
+
+
+
+1.Age
+```{r}
+Counts = table(df$age)
+barplot(Counts, main="age", xlab="age",  col = c("blue"))
+```
+
+
+```{r}
+boxplot(df$age, col = c("blue"))
+```
+
+
+```{r}
+summary(df$age)
+```
+
+
+
+2.Sex
+
+```{r}
+Counts = table(df$sex)
+barplot(Counts, main="sex", xlab="sex", col = c("blue"))
+```
+
+
+
+
+3.BMI
+```{r}
+hist(df$bmi, col = c("blue"))
+```
+```{r}
+boxplot(df$bmi,  col = c("blue"))
+```
+```{r}
+summary(df$bmi)
+```
+
+
+
+4.Children
+```{r}
+Counts = table(df$children)
+barplot(Counts, main="children", xlab="children",col = c("blue"))
+```
+```{r}
+boxplot(df$children,  col = c("blue"))
+```
+```{r}
+summary(df$children)
+```
+
+
+
+5.Smoker
+```{r}
+Counts = table(df$smoker)
+barplot(Counts, main="smoker", xlab="smoker",col = c("blue"))
+```
+
+
+
+6.Region
+```{r}
+Counts = table(df$region)
+barplot(Counts, main="region", xlab="region",col = c("blue"))
+```
+
+
+
+Variable Response - Charges
+```{r}
+hist(df$charges,col = c("blue"))
+```
+```{r}
+boxplot(df$charges,  col = c("blue"))
+```
+```{r}
+summary(df$charges)
+```
+
+
+
+We can see that charges don't have a normal distribution, making a log transformation give us a distribution that tends to normal. For this project that transformation will suffice.
+
+
+
+```{r}
+log_charges = log(df$charges)
+hist(log_charges,col = c("blue"))
+```
+```{r}
+# Histogram overlaid with kernel density curve
+ggplot(df, aes(x=charges)) + 
+    geom_histogram(aes(y=after_stat(density)),    
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666")  
+```
+```{r}
+ggplot(df, aes(x=log(charges))) + 
+    geom_histogram(aes(y=after_stat(density)),    
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666")  
+```
+
+
+
+
+
+Let's explore how other variables behave in relation to our response variable.
+
+
+```{r warning=FALSE}
+ggplot(df, aes(x=bmi, y=charges, color=smoker)) + 
+    geom_point(size=2) +
+    theme_ipsum() +
+    scale_color_manual(values=c("blue", "red"))
+```
+```{r warning=FALSE}
+ggplot(df, aes(x=age, y=charges, color=smoker)) + 
+    geom_point(size=2) +
+    theme_ipsum() +
+    scale_color_manual(values=c("blue", "red"))
+```
+
+
+
+
+
+From those plots we can see that people who smoke have higher costs. It seems that's the biggest correlation with the costs even without checking the correlation. Cost also seems to increase slightly with Age and BMI.
+We will check further correlations in the pre-processing step.
+
+
+### Pre-processing data
+
+
+
+```{r}
+#Changing yes and no to 0 and 1 in the column smoker
+df$smoker<-ifelse(df$smoker=="yes",1,0)
+Counts = table(df$smoker)
+barplot(Counts, main="smoker", xlab="smoker",  col = c("blue"))
+```
+```{r}
+#One hot encoding on the categorical variables remaining
+df <- dummy_cols(df,select_columns = "sex")
+df <- dummy_cols(df,select_columns = "region")
+```
+```{r}
+df = subset(df, select = -c(region) )
+df = subset(df, select = -c(sex) )
+```
+
+```{r}
+#Checking the correlation of our variables
+cor(cor(df))
+corrgram(df, order = TRUE, lower.panel = panel.shade, upper.panel = panel.pie, text.panel = panel.txt, main="df")
+```
+
+
+
+
+
+
+Smoker variable has the highest correlation with our response variable as we suspected. Age and BMI don't have a strong correlation, but are the next ones with the highest correlation with charges variable.
+
+
+
+
+
+Next we will apply log in the response variable and make some simple re-scaling in age and BMI.
+
+
+```{r}
+df$charges <- log(df$charges) 
+```
+
+```{r}
+df$bmi <- (df$bmi)/100
+df$age <- (df$age)/100
+```
+
+
+```{r}
+#Splitting data into train-test samples
+split = sample.split(Y=df$charges, SplitRatio=0.8)
+train = df[split,]
+test = df[!split,]
+
+dim(train)
+dim(test)
+```
+
+
+
+
+
+### Multiple Linear Regression
+
+
+
+
+Our first ML analysis is a multiple linear regression to determine the medical costs. 'Smoker', 'Age' and 'BMI' are our independent variables in this scenario.
+
+
+
+
+
+```{r}
+lr_model = lm(charges ~ smoker + age + bmi, data = train)
+lr_model
+```
+```{r}
+summary(lr_model)
+```
+```{r}
+Prediction <-predict(lr_model, newdata=test)
+results <- data.frame(Actual= test$charges, Prediction)
+head(results)
+```
+```{r}
+
+RSQUARE = function(y_actual,y_predict){
+  cor(y_actual,y_predict)^2
+}
+MAPE = function(y_actual,y_predict){
+  mean(abs((y_actual-y_predict)/y_actual))*100
+}
+```
+
+```{r}
+model_R_Squared = RSQUARE(test$charges, Prediction)
+model_R_Squared
+```
+```{r}
+model_MAPE = MAPE(test$charges, Prediction)
+model_MAPE
+```
+```{r}
+Accuracy_Linear = 100 - model_MAPE
+Accuracy_Linear
+```
+
+```{r}
+plot(Prediction, y= test$charges,
+     xlab='Predicted Values',
+     ylab='Actual Values',
+     main='Predicted vs. Actual Values',col = c("blue"))
+abline(a=0, b=1)
+```
+
