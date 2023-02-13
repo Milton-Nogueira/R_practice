@@ -36,7 +36,9 @@ For this analysis the independt variables used were Smoker and also Age and BMI,
  
  It's clear from the plots that people who smoke have the biggest costs, regardless of age or BMI.
  
- Splitting the model into 80% train, 20% test we obtained an R² = 0.784, so around 78% of the variability observed in the response variable is explained by the regression model.
+ The target variable wer normalized with a log transformation while the variables were rescaled in order to be in the interval [0,1].
+ 
+ Splitting the model into 80% train, 20% test and applying the model we obtained an R² = 0.784, so around 78% of the variability observed in the response variable is explained by the regression model.
  
 The Mean absolute percentage error (MAPE) of this approach was 3.21%.
 
